@@ -1,4 +1,5 @@
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Graphics;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -7,13 +8,19 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
+import java.lang.Thread;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
+
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+
 
 public class Solver extends JFrame implements MouseListener, MouseWheelListener, KeyListener {
 
@@ -25,7 +32,7 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 	boolean solving;
 	
 	public Solver () {
-		super("Sudoku Master 3000");
+		super("Sudoku Solver");
 		setSize(600, 600);
 		setResizable(false);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -51,6 +58,8 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 		
 		setVisible(true);
 		setSize(getWidth()+getInsets().left+getInsets().right, getHeight()+getInsets().top+getInsets().bottom);
+        
+        JOptionPane.showMessageDialog(this, "Welcome to the sudoku solver!\nPress H to see the key bindings", "Sudoku Solver", JOptionPane.INFORMATION_MESSAGE);
 	}
 	
 	public static void main (String[] args) {
@@ -67,7 +76,11 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 			gPaper.fillRect(0, s, 600, 3);
 			s+= 65+(i%2)*68;
 		}
-		gPaper.setColor(Color.red);
+		if (solving) {
+            gPaper.setColor(Color.orange);
+        } else {
+            gPaper.setColor(Color.red);
+        }
 		for (int i= 0; i<4; i++) {
 			gPaper.fillRect(i*198, 0, 6, 600);
 			gPaper.fillRect(0, i*198, 600, 6);
@@ -91,101 +104,169 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 	}
 	
 	public void startSolve () {
+        if (!isValidSudoku()) {
+            JOptionPane.showMessageDialog(this, "Entered soduku is not valid", "Sudoku Solver", JOptionPane.ERROR_MESSAGE);
+            solving = false;
+            return;
+        }
 		Set<Square> userInput= puzzle.values().stream().filter(Square::isFound).collect(Collectors.toSet());
 		crossAndBoxKilling(userInput);
 		repaint();
 	}
 	
 	public void instantSolve () {
-		Set<Square> userInput= puzzle.values().stream().filter(Square::isFound).collect(Collectors.toSet());
-		crossAndBoxKilling(userInput);
-		Set<Square> newFounds;
-		do {
-			lonelySquares();
-			lazerBoxLine();
-			newFounds= puzzle.values().stream().filter(Square::isNotFound).filter(Square::isSure).collect(Collectors.toSet());
-			crossAndBoxKilling(newFounds);
-		} while (puzzle.values().stream().filter(Square::isNotFound).collect(Collectors.toSet()).size() != 0);
-		repaint();
+		removeKeyListener(this);
+        this.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        
+        Set<Integer> input = puzzle.keySet().stream().filter(k -> puzzle.get(k).isFound()).collect(Collectors.toSet());
+        int current = 0;
+        boolean needToFix = false;
+		while (current < 9*9) {
+            
+            if (!needToFix && isValidSudoku()) {
+                if (puzzle.get(current).isFound()) {
+                    current++;
+                } else {
+                    puzzle.get(current).foundIt(0);
+                }
+            } else {
+                needToFix = true;
+                if (puzzle.get(current).isFound() && !input.contains(current)) {
+                    if (puzzle.get(current).getVal() == 8) {
+                        puzzle.get(current).reset();
+                    } else {
+                        puzzle.get(current).foundIt(puzzle.get(current).getVal()+1);
+                        needToFix = false;
+                    }
+                } else {
+                    current--;
+                }
+            }
+		} 
+        repaint();
+        this.setCursor(Cursor.getDefaultCursor());
+        JOptionPane.showMessageDialog(this, "Done", "Sudoku Solver", JOptionPane.INFORMATION_MESSAGE);
+		addKeyListener(this);
 	}
 	
-	public void goOnSolving () {
-		System.out.println("processing");
-		lonelySquares();
-		lazerBoxLine();
-		//turns sures in founds
-		Set<Square> newFounds= puzzle.values().stream().filter(Square::isNotFound).filter(Square::isSure).collect(Collectors.toSet());
-		crossAndBoxKilling(newFounds);
+	public void humanSolving () {
+        removeKeyListener(this);
+		boolean found = findingTechniques();
+        boolean update = updateAndSolidify();
+        
+        if (!update && !found) {
+            JOptionPane.showMessageDialog(this, "Human like solver is not able to find anything", "Sudoku Solver", JOptionPane.ERROR_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this, "One round of human like solving has been done", "Sudoku Solver", JOptionPane.INFORMATION_MESSAGE);
+        }
+        
 		repaint();
-		System.out.println("done");
+        addKeyListener(this);
 	}
+    
+    public boolean findingTechniques() {
+        boolean found = false;
+        boolean buff;
+        
+        buff = lonelySquares();
+		found |= buff;
+        
+        buff = lazerBoxLine();
+        found |= buff;
+        
+        return found;
+    }
+    
+    //turns sures in founds
+    public boolean updateAndSolidify() {
+        Set<Square> newFounds= puzzle.values().stream().filter(Square::isNotFound).filter(Square::isSure).collect(Collectors.toSet());
+		crossAndBoxKilling(newFounds);
+        return newFounds.size() > 0;
+    }
 	
 	private void crossAndBoxKilling(Set<Square> data) {
 		Iterator<Square> ite= data.iterator();
 		Set<Square> boxFriends, hLineFriends, vLineFriends;
 		while (ite.hasNext()) {
 			final Square current= ite.next();
-			boxFriends= puzzle.values().stream().filter(x -> x.isBox(current.box)).filter(Square::isNotFound).collect(Collectors.toSet());
-			hLineFriends= puzzle.values().stream().filter(x -> x.isHLine(current.hLine)).filter(Square::isNotFound).collect(Collectors.toSet());
-			vLineFriends= puzzle.values().stream().filter(x -> x.isVLine(current.vLine)).filter(Square::isNotFound).collect(Collectors.toSet());
-			boxFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
-			hLineFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
-			vLineFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
+            //Get box of current and remove posibility of value in it
+            boxFriends= puzzle.values().stream().filter(x -> x.isBox(current.box)).filter(Square::isNotFound).collect(Collectors.toSet());
+            boxFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
+            
+            //Get horizontal line of current and remove posibility of value int it
+            hLineFriends= puzzle.values().stream().filter(x -> x.isHLine(current.hLine)).filter(Square::isNotFound).collect(Collectors.toSet());
+            hLineFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
+            
+            //Get vertical line of current and remove posibility of value int it
+            vLineFriends= puzzle.values().stream().filter(x -> x.isVLine(current.vLine)).filter(Square::isNotFound).collect(Collectors.toSet());
+            vLineFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
 		}
 	}
 	
-	public void lonelySquares () {
-		
-		ArrayList<Set<Square>> boxAndLineFriends= new ArrayList<Set<Square>>();
+    /**
+     * Looks if a number is the only one of it's kind in the square and line
+     **/
+	public boolean lonelySquares () {
+		boolean changed = false;
+        
+		List<Set<Square>> boxAndLineFriends= new ArrayList<Set<Square>>();
 		Iterator<Square> iteboss;
 		int p;
 		Square proc;
 		
 		for (int i= 0; i<9; i++) { 
-			//Boucle des lignes et boites
+			//Lines and Boxes loop
 			final int n= i;
-			boxAndLineFriends.add(0, puzzle.values().stream().filter(x -> x.isBox(n)).filter(Square::isNotFound).collect(Collectors.toSet()));
-			boxAndLineFriends.add(1, puzzle.values().stream().filter(x -> x.isHLine(n)).filter(Square::isNotFound).collect(Collectors.toSet()));
-			boxAndLineFriends.add(2, puzzle.values().stream().filter(x -> x.isVLine(n)).filter(Square::isNotFound).collect(Collectors.toSet()));
+			boxAndLineFriends.add(0, puzzle.values().stream().filter(x -> x.isBox(n)).filter(Square::isNotFound).collect(Collectors.toSet())); //Retrieves box i
+			boxAndLineFriends.add(1, puzzle.values().stream().filter(x -> x.isHLine(n)).filter(Square::isNotFound).collect(Collectors.toSet())); //Retrieves horizontal line i
+			boxAndLineFriends.add(2, puzzle.values().stream().filter(x -> x.isVLine(n)).filter(Square::isNotFound).collect(Collectors.toSet())); //Retrieves vertival line i
 			for (int j= 0; j<9; j++) {
-				//Boucle des numeros
+				//Numbers loop
 				for (int x= 0; x<boxAndLineFriends.size(); x++) {
 					iteboss= boxAndLineFriends.get(x).iterator();
-					p= -1;
+					p= -1; //not found any
 					while (iteboss.hasNext()) {
 						proc= iteboss.next();
 						if (proc.maybe[j]) {
 							if (p == -1) {
 								p= proc.idKey;
 							} else {
-								p= -2;
+								p= -2; //found 2
 							}
 						}
 					}
 					if (p >= 0) {
 						proc= puzzle.get(p);
 						for (int k= 0; k<proc.maybe.length; k++) {
-							proc.maybe[k]= false;
+                            if (k != j && proc.maybe[k]) {
+                                changed = true;
+                                proc.maybe[k]= false;
+                            }
 						}
-						proc.maybe[j]=true;
 					}
 				}
 			}
 			boxAndLineFriends.clear();
 		}
+        return changed;
 	}
 	
-	public void lazerBoxLine () {
+    /**
+     * If there is two or three instances of a number in a box forming a line we delete this number from the line in other boxes
+     * 
+     **/
+	public boolean lazerBoxLine () {
+        boolean changed = false;
 		Set<Square> candidates, burned;
 		Square[] selection;
 		int hPos, vPos;
 		for (int i= 0; i<9; i++) {
-			//Pour chaque cube
+			//For each cube
 			final int c= i;
 			for (int j= 0; j<9; j++) {
-				//Pour chaque numero
+				//for each number
 				final int n= j;
-				candidates = puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.box == c).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
+				candidates = puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isBox(c)).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
 				if (candidates.size() == 2 || candidates.size() == 3) {
 					selection= candidates.toArray(new Square[0]);
 					hPos= selection[0].hLine;
@@ -198,21 +279,47 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 							vPos= -1;
 						}
 					}
-					if (hPos != -1) {
-						final int pos= hPos;
-						burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.hLine == pos).collect(Collectors.toSet());
-						burned.stream().forEach(sq -> sq.maybe[n]= false);
-						candidates.stream().forEach(sq -> sq.maybe[n]= true);
-					} else if (vPos != -1) {
-						final int pos= vPos;
-						burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.vLine == pos).collect(Collectors.toSet());
-						burned.stream().forEach(sq -> sq.maybe[n]= false);
-						candidates.stream().forEach(sq -> sq.maybe[n]= true);
-					}
+                    if (hPos != -1 || vPos != -1) {
+                        if (hPos != -1) {
+                            final int pos= hPos;
+                            burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isHLine(pos)).filter(sq -> !sq.isBox(c)).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
+                        } else {
+                            final int pos= vPos;
+                            burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isVLine(pos)).filter(sq -> !sq.isBox(c)).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
+                        }
+                        burned.stream().forEach(sq -> sq.maybe[n]= false);
+                        changed |= burned.size() > 0;
+                    }
+					
 				}
 			}
 		}
+        return changed;
 	}
+    
+    public boolean isValidSudoku() {
+        
+        List<Set<Square>> boxAndLineFriends= new ArrayList<Set<Square>>();
+        
+        for (int i= 0; i<9; i++) { 
+			//Lines and Boxes loop
+			final int n= i;
+			boxAndLineFriends.add(0, puzzle.values().stream().filter(x -> x.isBox(n)).filter(Square::isFound).collect(Collectors.toSet())); //Retrieves box i
+			boxAndLineFriends.add(1, puzzle.values().stream().filter(x -> x.isHLine(n)).filter(Square::isFound).collect(Collectors.toSet())); //Retrieves horizontal line i
+			boxAndLineFriends.add(2, puzzle.values().stream().filter(x -> x.isVLine(n)).filter(Square::isFound).collect(Collectors.toSet())); //Retrieves vertival line i
+            for (int j= 0; j<9; j++) {
+                final int m = j;
+                for (Set<Square> blF : boxAndLineFriends) {                    
+                    Set<Square> instances = blF.stream().filter(x -> x.isVal(m)).collect(Collectors.toSet());
+                    if (instances.size() > 1) {
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        return true;
+    }
 
 	@Override
 	public void mouseClicked(MouseEvent arg0) {
@@ -252,6 +359,10 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 
 	@Override
 	public void keyPressed(KeyEvent arg0) {
+        if (arg0.getKeyCode() == KeyEvent.VK_H) {
+            JOptionPane.showMessageDialog(this, "HELP\n\nEnter numbers with the key pad or mouse wheel\nSelect numbers with mouse or arrows\n\nPress Enter to start solving mode\nPress I for an exhaustive instant find\nPress P for one round of human like solving", "Sudoku Solver", JOptionPane.QUESTION_MESSAGE);
+        }
+        
 		if (!solving) {
 			switch (arg0.getKeyCode()) {
 				case KeyEvent.VK_NUMPAD0:
@@ -300,16 +411,19 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 				case KeyEvent.VK_RIGHT:
 					xSelect= (xSelect+1)%9;
 					break;
-				case KeyEvent.VK_I:
-					solving= true;
-					instantSolve();
-					break;
 				default:
 					return;
 			} 
 			repaint();
 		} else {
-			goOnSolving();
+            switch (arg0.getKeyCode()) {
+                case KeyEvent.VK_I:
+                    instantSolve();
+                    break;
+                case KeyEvent.VK_P:
+                    humanSolving();;
+                    break;
+            }
 		}
 		
 	}

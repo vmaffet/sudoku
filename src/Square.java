@@ -112,6 +112,14 @@ public class Square {
 	public boolean isVLine (int n) {
 		return (n == vLine);
 	}
+    
+    public boolean isVal(int n) {
+        return (n == value);
+    }
+    
+    public int getVal() {
+        return value;
+    }
 	
 	public boolean isSure () {
 		int t= -1;
