@@ -6,14 +6,14 @@ import java.awt.image.BufferedImage;
 
 public class Square {
 		
-	int hLine;
-	int vLine;
-	int box;
-	int idKey;
+	private int hLine;
+	private int vLine;
+	private int box;
+	private int idKey;
 	
-	boolean found;
-	int value;
-	boolean[] maybe;
+	private boolean found;
+	private int value;
+	private boolean[] maybe;
 	
 	public Square (int x, int y) {
 		vLine= x;
@@ -75,6 +75,46 @@ public class Square {
 		
 		return vision;
 	}
+    
+    public int getVal() {
+        return value;
+    }
+    
+    public int getBox() {
+        return box;
+    }
+    
+    public int getHLine() {
+        return hLine;
+    }
+    
+    public int getVLine() {
+        return vLine;
+    }
+    
+    public int getID() {
+        return idKey;
+    }
+    
+    public int getMaybeLength() {
+        return maybe.length;
+    }
+    
+    public boolean getMaybe(int k) {
+        if (k >= 0 && k < maybe.length) {
+            return maybe[k];
+        }
+        return false;
+    }
+    
+    public boolean setMaybe(int k, boolean b) {
+        if (k >= 0 && k < maybe.length) {
+            boolean old = maybe[k];
+            maybe[k] = b;
+            return old != b;
+        }
+        return false;
+    }
 	
 	public void foundIt (int val) {
 		found= true;
@@ -104,21 +144,29 @@ public class Square {
 	public boolean isBox (int n) {
 		return (n == box);
 	}
+    
+    public boolean isSameBox (Square sq) {
+		return (sq.getBox() == box);
+	}
 	
 	public boolean isHLine (int n) {
 		return (n == hLine);
+	}
+    
+    public boolean isSameHLine (Square sq) {
+		return (sq.getHLine() == hLine);
 	}
 	
 	public boolean isVLine (int n) {
 		return (n == vLine);
 	}
     
+    public boolean isSameVLine (Square sq) {
+		return (sq.getVLine() == vLine);
+	}
+    
     public boolean isVal(int n) {
         return (n == value);
-    }
-    
-    public int getVal() {
-        return value;
     }
 	
 	public boolean isSure () {

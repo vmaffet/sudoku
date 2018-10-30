@@ -190,16 +190,16 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 		while (ite.hasNext()) {
 			final Square current= ite.next();
             //Get box of current and remove posibility of value in it
-            boxFriends= puzzle.values().stream().filter(x -> x.isBox(current.box)).filter(Square::isNotFound).collect(Collectors.toSet());
-            boxFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
+            boxFriends= puzzle.values().stream().filter(x -> x.isSameBox(current)).filter(Square::isNotFound).collect(Collectors.toSet());
+            boxFriends.stream().forEach(elmnt -> elmnt.setMaybe(current.getVal(),false));
             
             //Get horizontal line of current and remove posibility of value int it
-            hLineFriends= puzzle.values().stream().filter(x -> x.isHLine(current.hLine)).filter(Square::isNotFound).collect(Collectors.toSet());
-            hLineFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
+            hLineFriends= puzzle.values().stream().filter(x -> x.isSameHLine(current)).filter(Square::isNotFound).collect(Collectors.toSet());
+            hLineFriends.stream().forEach(elmnt -> elmnt.setMaybe(current.getVal(),false));
             
             //Get vertical line of current and remove posibility of value int it
-            vLineFriends= puzzle.values().stream().filter(x -> x.isVLine(current.vLine)).filter(Square::isNotFound).collect(Collectors.toSet());
-            vLineFriends.stream().forEach(elmnt -> elmnt.maybe[current.value]= false);
+            vLineFriends= puzzle.values().stream().filter(x -> x.isSameVLine(current)).filter(Square::isNotFound).collect(Collectors.toSet());
+            vLineFriends.stream().forEach(elmnt -> elmnt.setMaybe(current.getVal(),false));
 		}
 	}
 	
@@ -227,9 +227,9 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 					p= -1; //not found any
 					while (iteboss.hasNext()) {
 						proc= iteboss.next();
-						if (proc.maybe[j]) {
+						if (proc.getMaybe(j)) {
 							if (p == -1) {
-								p= proc.idKey;
+								p= proc.getID();
 							} else {
 								p= -2; //found 2
 							}
@@ -237,10 +237,10 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 					}
 					if (p >= 0) {
 						proc= puzzle.get(p);
-						for (int k= 0; k<proc.maybe.length; k++) {
-                            if (k != j && proc.maybe[k]) {
+						for (int k= 0; k<proc.getMaybeLength(); k++) {
+                            if (k != j && proc.getMaybe(k)) {
                                 changed = true;
-                                proc.maybe[k]= false;
+                                proc.setMaybe(k, false);
                             }
 						}
 					}
@@ -266,28 +266,28 @@ public class Solver extends JFrame implements MouseListener, MouseWheelListener,
 			for (int j= 0; j<9; j++) {
 				//for each number
 				final int n= j;
-				candidates = puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isBox(c)).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
+				candidates = puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isBox(c)).filter(sq -> sq.getMaybe(n)).collect(Collectors.toSet());
 				if (candidates.size() == 2 || candidates.size() == 3) {
 					selection= candidates.toArray(new Square[0]);
-					hPos= selection[0].hLine;
-					vPos= selection[0].vLine;
+					hPos= selection[0].getHLine();
+					vPos= selection[0].getVLine();
 					for (int k= 1; k<selection.length; k++) {
-						if (hPos != selection[k].hLine) {
+						if (hPos != selection[k].getHLine()) {
 							hPos= -1;
 						}
-						if (vPos != selection[k].vLine) {
+						if (vPos != selection[k].getVLine()) {
 							vPos= -1;
 						}
 					}
                     if (hPos != -1 || vPos != -1) {
                         if (hPos != -1) {
                             final int pos= hPos;
-                            burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isHLine(pos)).filter(sq -> !sq.isBox(c)).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
+                            burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isHLine(pos)).filter(sq -> !sq.isBox(c)).filter(sq -> sq.getMaybe(n)).collect(Collectors.toSet());
                         } else {
                             final int pos= vPos;
-                            burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isVLine(pos)).filter(sq -> !sq.isBox(c)).filter(sq -> sq.maybe[n]).collect(Collectors.toSet());
+                            burned= puzzle.values().stream().filter(Square::isNotFound).filter(sq -> sq.isVLine(pos)).filter(sq -> !sq.isBox(c)).filter(sq -> sq.getMaybe(n)).collect(Collectors.toSet());
                         }
-                        burned.stream().forEach(sq -> sq.maybe[n]= false);
+                        burned.stream().forEach(sq -> sq.setMaybe(n, false));
                         changed |= burned.size() > 0;
                     }
 					
